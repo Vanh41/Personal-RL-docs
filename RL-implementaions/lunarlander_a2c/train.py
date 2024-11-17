@@ -49,20 +49,22 @@ for episode in range(num_episodes):
     total_reward = 0
     steps = 0
     while not done:
-        action_probs = actor(state)
+        action_probs = actor(torch.from_numpy(state))
         dist = torch.distributions.Categorical(probs = action_probs)
+        log_prob = dist.sample()
         action = dist.sample()
-        log_prob = dist.log_prob(action)
-        next_state, reward, done, info = env.step(action.item())
-        state = next_state
+        next_state, reward, done, info = env.step(action.detach().data.numpy())
         total_reward += reward
         steps += 1
         memory.add(log_prob, critic(state), reward, done)
+        state = next_state
         if done or steps >= maxsteps:
-            break
-        train(memory, total_reward)
+            last_q_val = critic(torch.from_numpy(next_state))
+            train(memory, last_q_val)
+            memory.clear()
         episode_reward.append(total_reward)
         print(f"Episode {episode + 1}/{num_episodes}, Total Reward: {total_reward}")
+            
 
 torch.save(actor.state_dict(), 'actor_model.pth')
 torch.save(critic.state_dict(), 'critic_model.pth')
