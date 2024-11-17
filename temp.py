@@ -14,7 +14,7 @@ env = gym.make("LunarLander-v3")
 
 gamma = 0.99
 learning_rate = 0.001
-num_episodes = 100
+num_episodes = 1000
 actor = ActorNetwork(env)
 actor_optimizer = optim.Adam(actor.parameters(), lr = learning_rate)
 critic = CriticNetwork(env)
@@ -49,26 +49,24 @@ for episode in range(num_episodes):
     total_reward = 0
     steps = 0
     while not done:
-       state = torch.tensor(state, dtype = torch.float32)
-       action_probs = actor(state)
-       dist = torch.distributions.Categorical(probs = action_probs)
-       action = dist.sample()
-       next_state, reward, terminated, done, info = env.step(action.item())
-       next_state = torch.tensor(next_state, dtype = torch.float32)
-       total_reward += reward
-       steps += 1
-       # compute critic val
-       value = critic(state)
-       memory.add(dist.log_prob(action), value, reward, done)
-       
-       state = next_state
-       if done or steps >= maxsteps:
+        state = torch.tensor(state, dtype=torch.float32)
+        action_probs = actor(state)
+        dist = torch.distributions.Categorical(probs = action_probs)
+        log_prob = dist.sample()
+        action = dist.sample()
+        next_state, reward, truncation ,done, info = env.step(action.detach().data.numpy())
+        total_reward += reward
+        steps += 1
+        memory.add(log_prob, critic(state), reward, done)
+        state = next_state
+        if done or steps >= maxsteps:
             next_state = torch.tensor(next_state, dtype=torch.float32)
             last_q_val = critic(next_state)
             train(memory, last_q_val)
             memory.clear()
-    episode_reward.append(total_reward)
-    print(f"Episode {episode + 1}/{num_episodes}, Total Reward: {total_reward}")
+        episode_reward.append(total_reward)
+        print(f"Episode {episode + 1}/{num_episodes}, Total Reward: {total_reward}")
+            
 
 torch.save(actor.state_dict(), 'actor_model.pth')
 torch.save(critic.state_dict(), 'critic_model.pth')
