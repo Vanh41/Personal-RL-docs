@@ -15,7 +15,6 @@ env = gym.make("LunarLander-v3")
 
 gamma = 0.99
 learning_rate = 0.001
-num_episodes = 100
 eps = np.finfo(np.float32).eps.item()
 actor = ActorNetwork(env)
 actor_optimizer = optim.Adam(actor.parameters(), lr = learning_rate)
