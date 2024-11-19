@@ -32,3 +32,22 @@ class Memory():
             yield data
     def __len__(self):
         return len(self.rewards)
+    
+
+class logits():
+    def __init__(self):
+        self.saved_action = []
+        self.rewards = []
+    def add(self, saved_action, reward):
+        self.saved_action.append(saved_action)
+        self.rewards.append(reward)
+    def clear(self):
+        self.saved_action.clear()
+        self.rewards.clear()
+    def _zip(self):
+        return zip(self.saved_action, self.rewards)
+    def __iter__(self):
+        for data in self.saved_action:
+            return data
+    def __len__(self):
+        return len(self.rewards)
