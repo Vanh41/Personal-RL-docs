@@ -17,6 +17,7 @@ class ActorNetwork(nn.Module):
             nn.Linear(128, env.action_space.n),
             nn.Softmax(dim=-1)
         )
+        self.saved_actions = []
     def forward(self, x):
         return self.network(x)
 

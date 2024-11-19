@@ -1,124 +1,77 @@
-import os
+import gymnasium as gym
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
-import gymnasium as gym
-from torch.distributions import Categorical
+import random
+from collections import deque
+from memory import Memory
+from model import ActorNetwork, CriticNetwork
 
-# Actor Network
-class Actor(nn.Module):
-    def __init__(self, input_size, num_actions):
-        super(Actor, self).__init__()
-        self.fc1 = nn.Linear(input_size, 64)
-        self.fc2 = nn.Linear(64, num_actions)
+env = gym.make("LunarLander-v3")
 
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.softmax(self.fc2(x), dim=-1)
-        return x
+# hyperparameters
 
-# Critic Network
-class Critic(nn.Module):
-    def __init__(self, input_size):
-        super(Critic, self).__init__()
-        self.fc1 = nn.Linear(input_size, 64)
-        self.fc2 = nn.Linear(64, 1)
+gamma = 0.99
+learning_rate = 0.001
+num_episodes = 100
+actor = ActorNetwork(env)
+actor_optimizer = optim.Adam(actor.parameters(), lr = learning_rate)
+critic = CriticNetwork(env)
+critic_optimizer = optim.Adam(critic.parameters(), lr = learning_rate)
+memory = Memory()
+maxsteps = 200
 
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
-
-def save_model(actor, critic, actor_path, critic_path):
-    torch.save(actor.state_dict(), actor_path)
-    torch.save(critic.state_dict(), critic_path)
-    print(f"Saved actor model to {actor_path}")
-    print(f"Saved critic model to {critic_path}")
-
-def load_model(actor, critic, actor_path, critic_path):
-    actor.load_state_dict(torch.load(actor_path))
-    critic.load_state_dict(torch.load(critic_path))
-    actor.eval()
-    critic.eval()
-    print(f"Loaded actor model from {actor_path}")
-    print(f"Loaded critic model from {critic_path}")
-
-def actor_critic(actor, critic, episodes, max_steps=2000, gamma=0.99, lr_actor=1e-3, lr_critic=1e-3):
-    optimizer_actor = optim.AdamW(actor.parameters(), lr=lr_actor)
-    optimizer_critic = optim.AdamW(critic.parameters(), lr=lr_critic)
-    stats = {'Actor Loss': [], 'Critic Loss': [], 'Returns': []}
-
-    env = gym.make('LunarLander-v3')
-    input_size = env.observation_space.shape[0]
-    num_actions = env.action_space.n
-
-    for episode in range(1, episodes + 1):
-        state, info = env.reset()
-        ep_return = 0
-        done = False
-        step_count = 0
-
-        while not done and step_count < max_steps:
-            state_tensor = torch.FloatTensor(state)
-            
-            # Actor selects action
-            action_probs = actor(state_tensor)
-            dist = Categorical(action_probs)
-            action = dist.sample()
-            
-            # Take action and observe next state and reward
-            next_state, reward, terminated, done, info = env.step(action.item())
-            next_state_tensor = torch.FloatTensor(next_state)
-            ep_return += reward
-            step_count += 1
-
-            # Update state
-            state = next_state
-
-        stats['Returns'].append(ep_return)
-        print(f"Episode {episode}/{episodes}, Return: {ep_return}")
-
-    return stats
-
-if __name__ == "__main__":
-    actor_path = "actor_model.pth"
-    critic_path = "critic_model.pth"
-
-    env = gym.make('LunarLander-v3')
-    input_size = env.observation_space.shape[0]
-    num_actions = env.action_space.n
-
-    # Check if pretrained model exists
-    if os.path.exists(actor_path) and os.path.exists(critic_path):
-        print("Loading pretrained models...")
-        actor = Actor(input_size=input_size, num_actions=num_actions)
-        critic = Critic(input_size=input_size)
-        load_model(actor, critic, actor_path, critic_path)
-    else:
-        print("Training new models...")
-        actor = Actor(input_size=input_size, num_actions=num_actions)
-        critic = Critic(input_size=input_size)
-        episodes = 100  # Number of episodes for training
-        stats = actor_critic(actor, critic, episodes)
-        save_model(actor, critic, actor_path, critic_path)
+# train func
+def train(memory, q_val):
+    values = torch.stack(memory.values)
+    q_vals = torch.zeros(len(memory), 1)
+    # target values are calculated backward
+    for i, (_, _, reward, done) in enumerate(memory.reversed()):
+        q_val = reward + (1-done)*gamma*q_val
+        q_vals[len(memory)-1-i] = q_val # store values from the end to the beginning
+    advantage = torch.Tensor(q_vals) - values
+    #update actor
+    actor_loss = (-torch.stack(memory.log_probs)*advantage.detach()).mean()
+    actor_optimizer.zero_grad()
+    actor_loss.backward()
+    actor_optimizer.step()
+    #update critic
+    critic_loss = advantage.pow(2).mean()
+    critic_optimizer.zero_grad()
+    critic_loss.backward()
+    critic_optimizer.step()
     
-    # Test the trained agent in human mode
-    env = gym.make('LunarLander-v3', render_mode='human')
-    state = env.reset()[0]
+episode_reward = []
+for episode in range(num_episodes):
+    state, info = env.reset()
     done = False
     total_reward = 0
-    max_steps = 2000  # Maximum steps per episode for testing
-    
+    steps = 0
     while not done:
-        env.render()
-        state_tensor = torch.FloatTensor(state)
-        action_probs = actor(state_tensor)
-        action = torch.argmax(action_probs).item()
-        state, reward, done, _, _ = env.step(action)
-        total_reward += reward
-        if total_reward >= max_steps:
-            break
+       state = torch.tensor(state, dtype = torch.float32)
+       action_probs = actor(state)
+       dist = torch.distributions.Categorical(probs = action_probs)
+       action = dist.sample()
+       next_state, reward, terminated, done, info = env.step(action.item())
+       next_state = torch.tensor(next_state, dtype = torch.float32)
+       total_reward += reward
+       steps += 1
+       # compute critic val
+       value = critic(state)
+       memory.add(dist.log_prob(action), value, reward, done)
+       
+       state = next_state
+       if done or steps >= maxsteps:
+            next_state = torch.tensor(next_state, dtype=torch.float32)
+            last_q_val = critic(next_state)
+            train(memory, last_q_val)
+            memory.clear()
+    episode_reward.append(total_reward)
+    print(f"Episode {episode + 1}/{num_episodes}, Total Reward: {total_reward}")
+
+torch.save(actor.state_dict(), 'actor_model.pth')
+torch.save(critic.state_dict(), 'critic_model.pth')
+        
     
-    print(f"Total reward in human mode: {total_reward}")
-    env.close()
+    
