@@ -14,8 +14,8 @@ env = gym.make("LunarLander-v3", render_mode="human")
 # Load the trained models
 actor = ActorNetwork(env)
 critic = CriticNetwork(env)
-actor.load_state_dict(torch.load('actor_model.pth'))
-critic.load_state_dict(torch.load('critic_model.pth'))
+actor.load_state_dict(torch.load('/Users/vietanh/Documents/Personal-RL-docs/RL-implementaions/lunarlander_a2c/actor_model.pth'))
+critic.load_state_dict(torch.load('/Users/vietanh/Documents/Personal-RL-docs/RL-implementaions/lunarlander_a2c/critic_model.pth'))
 
 def run_episode(env, actor):
     state, _ = env.reset()

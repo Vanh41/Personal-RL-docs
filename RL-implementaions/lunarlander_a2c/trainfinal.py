@@ -97,8 +97,8 @@ def main():
         print(f"Episode {i_episode + 1}/{num_episodes}, Total Reward: {ep_reward}")
 
     # Save the trained models
-    torch.save(actor.state_dict(), 'actor_model.pth')
-    torch.save(critic.state_dict(), 'critic_model.pth')
+    torch.save(actor.state_dict(), '/Users/vietanh/Documents/Personal-RL-docs/RL-implementaions/lunarlander_a2c/actor_model.pth')
+    torch.save(critic.state_dict(), '/Users/vietanh/Documents/Personal-RL-docs/RL-implementaions/lunarlander_a2c/critic_model.pth')
 
 if __name__ == '__main__':
     main()
