@@ -20,7 +20,7 @@ actor = ActorNetwork(env)
 actor_optimizer = optim.Adam(actor.parameters(), lr = learning_rate)
 critic = CriticNetwork(env)
 critic_optimizer = optim.Adam(critic.parameters(), lr = learning_rate)
-memory = RolloutBuffer()
+# memory = RolloutBuffer()
 maxsteps = 200
 
 
