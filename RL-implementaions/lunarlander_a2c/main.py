@@ -6,7 +6,7 @@ import torch.optim as optim
 import random
 from collections import deque
 from collections import namedtuple
-from memory import logits
+from memory import RolloutBuffer
 from model import ActorNetwork, CriticNetwork
 
 env = gym.make("LunarLander-v3", render_mode="human")

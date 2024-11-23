@@ -34,7 +34,7 @@ class Memory():
         return len(self.rewards)
     
 
-class logits():
+class RolloutBuffer():
     def __init__(self):
         self.saved_action = []
         self.rewards = []

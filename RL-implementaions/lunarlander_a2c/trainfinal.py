@@ -6,7 +6,7 @@ import torch.optim as optim
 import random
 from collections import deque
 from collections import namedtuple
-from memory import logits
+from memory import RolloutBuffer
 from model import ActorNetwork, CriticNetwork
 SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 env = gym.make("LunarLander-v3")
@@ -20,7 +20,7 @@ actor = ActorNetwork(env)
 actor_optimizer = optim.Adam(actor.parameters(), lr = learning_rate)
 critic = CriticNetwork(env)
 critic_optimizer = optim.Adam(critic.parameters(), lr = learning_rate)
-memory = logits()
+memory = RolloutBuffer()
 maxsteps = 200
 
 
