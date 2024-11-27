@@ -16,7 +16,7 @@ class RolloutBuffer():
         self.dones = []
     def add(self, action, state, log_prob, value, reward, done):
         self.actions.append(action)
-        self.actions.append(state)
+        self.states.append(state)
         self.log_probs.append(log_prob)
         self.values.append(value)
         self.rewards.append(reward)
