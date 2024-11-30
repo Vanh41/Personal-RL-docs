@@ -12,12 +12,11 @@ env = gym.make("LunarLander-v3")
 # hyperparamters 
 gamma = 0.99
 learning_rate = 0.0001
-alpha = 0.0003
 gae_lambda = 0.95
 clip_epsilon = 0.2
 batch_size = 64
 n_epochs = 10
-num_episodes = 1028
+num_episodes = 300
 
 actor = ActorNetwork(env)
 critic = CriticNetwork(env)
@@ -47,11 +46,11 @@ def train():
             discount = 1
             a_t = 0
             for k in range(t, len(reward_arr) - 1):
-                a_t += discount * (reward_arr[k] + gamma*values[k + 1] * (1-dones_arr[k]) - values[k])
+                a_t += discount * (reward_arr[k] + gamma*values[k + 1] * (1-int(dones_arr[k])) - values[k])
                 discount *= gamma*gae_lambda
             advantage[t] = a_t
-        advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
-        advantage = torch.FloatTensor(advantage)
+
+        # advantage = torch.FloatTensor(advantage)
         values = torch.FloatTensor(values)
         for batch in batches:
             states = torch.FloatTensor(state_arr[batch])
@@ -105,8 +104,8 @@ if __name__ == '__main__':
         avg_score = np.mean(score_history[-100:])
         print(f'episode {i} score {score} avg score {avg_score}')
         
-torch.save(actor.state_dict(), 'actor_model.pth')
-torch.save(critic.state_dict(), 'critic_model.pth')
+torch.save(actor.state_dict(), '/Users/vietanh/Documents/Personal-RL-docs/RL-implementaions/lunarlander_ppo/actor_model.pth')
+torch.save(critic.state_dict(), '/Users/vietanh/Documents/Personal-RL-docs/RL-implementaions/lunarlander_ppo/critic_model.pth')
 
 
             

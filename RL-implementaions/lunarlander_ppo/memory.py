@@ -40,8 +40,8 @@ class RolloutBuffer():
         self.dones.append(done)
     
     def clear(self):
-        self.actions 
         self.states.clear()
+        self.actions.clear()
         self.probs.clear()
         self.values.clear()
         self.rewards.clear()

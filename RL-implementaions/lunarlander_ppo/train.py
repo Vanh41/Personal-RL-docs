@@ -202,8 +202,7 @@ if __name__ == '__main__':
         score_history.append(score)
         avg_score = np.mean(score_history[-100:])
 
-        if avg_score > 200:
-            agent.actor.save_checkpoint()
-            agent.critic.save_checkpoint()
+        agent.actor.save_checkpoint()
+        agent.critic.save_checkpoint()
 
         print(f'episode {i} score {score} avg score {avg_score} time_steps {n_steps} learning_steps {learn_iters}')
