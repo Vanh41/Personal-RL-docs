@@ -11,18 +11,17 @@ from model import ActorNetwork, CriticNetwork
 env = gym.make("LunarLander-v3")
 # hyperparamters 
 gamma = 0.99
-learning_rate = 0.0001
+learning_rate = 0.001
 gae_lambda = 0.95
 clip_epsilon = 0.2
-batch_size = 64
-n_epochs = 10
-num_episodes = 300
+batch_size = 5
+n_epochs = 4
+num_episodes = 1000
 
 actor = ActorNetwork(env)
 critic = CriticNetwork(env)
 actor_optimizer = optim.Adam(actor.parameters(), lr = learning_rate)
 critic_optimizer = optim.Adam(critic.parameters(), lr = learning_rate)
-critic = CriticNetwork(env)
 buffer = RolloutBuffer(batch_size)
 
 def chooseAction(state):
@@ -37,10 +36,10 @@ def chooseAction(state):
 
 
 def train():
-    for i in range(n_epochs):
+    for _ in range(n_epochs):
         action_arr, state_arr, old_prob_arr, values_arr, reward_arr, dones_arr, batches = buffer.generate_batches()
         values = values_arr
-        advantage = torch.zeros(len(reward_arr), dtype = torch.float32)
+        advantage = np.zeros(len(reward_arr), dtype = np.float32)
         
         for t in range(len(reward_arr)-1):
             discount = 1
@@ -50,7 +49,7 @@ def train():
                 discount *= gamma*gae_lambda
             advantage[t] = a_t
 
-        # advantage = torch.FloatTensor(advantage)
+        advantage = torch.FloatTensor(advantage)
         values = torch.FloatTensor(values)
         for batch in batches:
             states = torch.FloatTensor(state_arr[batch])
@@ -63,14 +62,15 @@ def train():
             critic_value = critic(states)
             critic_value = torch.squeeze(critic_value)
 
-            ratio = torch.exp(new_probs - old_probs)
-            clipped_ratio = torch.clamp(ratio, 1 - clip_epsilon, 1 + clip_epsilon)
-            actor_loss = -torch.min(ratio * advantage[batch], clipped_ratio * advantage[batch]).mean()
+            prob_ratio = torch.exp(new_probs - old_probs)
+            weighted_probs = advantage[batch] * prob_ratio
+            weighted_clipped_probs = torch.clamp(prob_ratio, 1 - clip_epsilon, 1 + clip_epsilon) * advantage[batch]
+            actor_loss = -torch.min(weighted_probs, weighted_clipped_probs).mean()
             
             returns = advantage[batch] + values[batch]
-            # critic_loss = nn.MSELoss()(returns, critic_value)
             critic_loss = (returns - critic_value) ** 2
             critic_loss = critic_loss.mean()
+            
             loss = actor_loss + 0.5 * critic_loss
             actor_optimizer.zero_grad()
             critic_optimizer.zero_grad()

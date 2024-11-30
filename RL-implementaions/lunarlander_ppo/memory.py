@@ -32,16 +32,16 @@ class RolloutBuffer():
                 batches
     
     def store_memory(self, state, action, prob, value, reward, done):
-        self.states.append(state)
         self.actions.append(action)
+        self.states.append(state)
         self.probs.append(prob)
         self.values.append(value)
         self.rewards.append(reward)
         self.dones.append(done)
     
     def clear(self):
-        self.states.clear()
         self.actions.clear()
+        self.states.clear()
         self.probs.clear()
         self.values.clear()
         self.rewards.clear()
