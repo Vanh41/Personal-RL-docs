@@ -31,7 +31,7 @@ def run_episode(env, actor):
     return total_reward
 
 if __name__ == '__main__':
-    num_episodes = 1
+    num_episodes = 2
     for i in range(num_episodes):
         total_reward = run_episode(env, actor)
         print(f"Episode {i + 1}: Total Reward: {total_reward}")
