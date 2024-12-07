@@ -10,38 +10,40 @@ from collections import deque
 class ActorNetwork(nn.Module):
     def __init__(self, env):
         super().__init__()
-        obs_shape = env.observation_space['image'].shape
+        obs_shape = env.observation_space['image'].shape[2]
         self.network = nn.Sequential(
-            nn.Conv2d(obs_shape[0], 32, (2, 2)),
+            nn.Conv2d(obs_shape, 32, (2, 2)),
             nn.ReLU(),
             nn.Conv2d(32, 64, (2, 2)),
             nn.ReLU(),
             nn.Conv2d(64, 128, (2, 2)),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(128 * 7 * 7, 512),
+            nn.Linear(128 * 4 * 4, 512),
             nn.ReLU(),
             nn.Linear(512, env.action_space.n),
-            nn.Softmax(dim = -1)
+            nn.Softmax(dim=-1)
         )
+    
     def forward(self, x):
         return self.network(x)
-    
+
 class CriticNetwork(nn.Module):
     def __init__(self, env):
         super().__init__()
-        obs_shape = env.observation_space['image'].shape
+        obs_shape = env.observation_space['image'].shape[2]
         self.network = nn.Sequential(
-            nn.Conv2d(obs_shape[0], 32, (2, 2)),
+            nn.Conv2d(obs_shape, 32, (2, 2)),
             nn.ReLU(),
             nn.Conv2d(32, 64, (2, 2)),
             nn.ReLU(),
             nn.Conv2d(64, 128, (2, 2)),
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(128 * 7 * 7, 512),
+            nn.Linear(128 * 4 * 4, 512),
             nn.ReLU(),
             nn.Linear(512, 1)
         )
+    
     def forward(self, x):
         return self.network(x)
