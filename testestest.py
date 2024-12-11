@@ -1,132 +1,162 @@
 import gymnasium as gym
-import minigrid
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-from torch.distributions import Categorical
+from collections import deque
 
-# Tạo môi trường MiniGrid
-env = gym.make("MiniGrid-LavaCrossingS11N5-v0")
+# Hyperparameters
+IMG_SHAPE = (3, 84, 84)  # PyTorch format: (channels, height, width)
+GAMMA = 0.99
+LEARNING_RATE = 3e-4
+CLIP_EPSILON = 0.2
+UPDATE_EPOCHS = 4
+MINIBATCH_SIZE = 64
+BUFFER_CAPACITY = 2048
 
-# Cấu trúc mạng Actor-Critic
-class ActorCriticNetwork(nn.Module):
-    def __init__(self, input_shape, num_actions):
-        super(ActorCriticNetwork, self).__init__()
-        
-        # Mạng CNN để xử lý ảnh
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding=1)
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1)
-        
-        # Lớp Flatten
-        self.flatten = nn.Flatten()
-        
-        # Lớp fully connected
-        self.fc = nn.Linear(128 * 11 * 11, 512)
-        
-        # Actor: Lớp output phân phối xác suất cho hành động
-        self.actor_fc = nn.Linear(512, num_actions)
-        
-        # Critic: Lớp output giá trị (value function)
-        self.critic_fc = nn.Linear(512, 1)
+# Preprocessing function
+def preprocess_frame(frame):
+    frame = torch.tensor(frame, dtype=torch.float32).permute(2, 0, 1) / 255.0
+    frame = torch.nn.functional.interpolate(frame.unsqueeze(0), size=(84, 84)).squeeze(0)
+    return frame
+
+# Policy Network
+class PolicyNetwork(nn.Module):
+    def __init__(self, action_space):
+        super(PolicyNetwork, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(3, 32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU()
+        )
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(64 * 7 * 7, 512),
+            nn.ReLU()
+        )
+        self.actor = nn.Linear(512, action_space)
+        self.critic = nn.Linear(512, 1)
 
     def forward(self, x):
-        # Pass qua các lớp CNN
-        x = torch.relu(self.conv1(x))
-        x = torch.relu(self.conv2(x))
-        x = torch.relu(self.conv3(x))
-        
-        # Lớp Flatten
-        x = self.flatten(x)
-        
-        # Pass qua lớp fully connected
-        x = torch.relu(self.fc(x))
-        
-        # Output của actor (phân phối xác suất hành động)
-        action_probs = torch.softmax(self.actor_fc(x), dim=-1)
-        
-        # Output của critic (giá trị trạng thái)
-        state_value = self.critic_fc(x)
-        
-        return action_probs, state_value
+        x = self.conv(x)
+        x = self.fc(x)
+        return self.actor(x), self.critic(x)
 
-# Khởi tạo môi trường và mạng
-input_shape = (3, 11, 11)  # 3 channel RGB, 11x11 grid
-num_actions = env.action_space.n
-actor_critic = ActorCriticNetwork(input_shape, num_actions)
+# Buffer for PPO
+class PPOBuffer:
+    def __init__(self):
+        self.states = []
+        self.actions = []
+        self.log_probs = []
+        self.rewards = []
+        self.dones = []
 
-# Khởi tạo optimizer
-optimizer = optim.Adam(actor_critic.parameters(), lr=0.0003)
+    def store(self, state, action, log_prob, reward, done):
+        self.states.append(state)
+        self.actions.append(action)
+        self.log_probs.append(log_prob)
+        self.rewards.append(reward)
+        self.dones.append(done)
 
-# Hàm tính lợi nhuận (return)
-def compute_returns(next_value, rewards, masks, gamma=0.99):
+    def clear(self):
+        self.states.clear()
+        self.actions.clear()
+        self.log_probs.clear()
+        self.rewards.clear()
+        self.dones.clear()
+
+# Calculate discounted returns
+def compute_returns(rewards, dones, gamma):
     returns = []
-    R = next_value
-    for reward, mask in zip(reversed(rewards), reversed(masks)):
-        R = reward + gamma * R * mask
-        returns.insert(0, R)
-    return returns
+    G = 0
+    for reward, done in zip(reversed(rewards), reversed(dones)):
+        if done:
+            G = 0
+        G = reward + gamma * G
+        returns.insert(0, G)
+    return torch.tensor(returns, dtype=torch.float32)
 
-# Hàm huấn luyện
-def train(env, actor_critic, optimizer, num_epochs=1000, gamma=0.99):
-    for epoch in range(num_epochs):
-        state = env.reset()
-        state = torch.tensor(state['image'], dtype=torch.float32).unsqueeze(0).permute(0, 3, 1, 2) / 255.0  # Normalize
-        
-        rewards = []
-        log_probs = []
-        values = []
-        masks = []
-        actions = []
-        
-        for t in range(1000):  # Maximum steps per episode
-            # Chọn hành động từ actor
-            action_probs, state_value = actor_critic(state)
-            dist = Categorical(action_probs)
+# PPO Training Function
+def train_ppo(env, episodes):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    action_space = env.action_space.n
+
+    policy = PolicyNetwork(action_space).to(device)
+    optimizer = optim.Adam(policy.parameters(), lr=LEARNING_RATE)
+
+    buffer = PPOBuffer()
+
+    for episode in range(episodes):
+        state = preprocess_frame(env.reset()).to(device)
+        episode_reward = 0
+        done = False
+
+        while not done:
+            logits, value = policy(state.unsqueeze(0))
+            dist = torch.distributions.Categorical(logits=logits)
             action = dist.sample()
-            
-            # Thực hiện hành động
-            next_state, reward, done, _, info = env.step(action.item())
-            next_state = torch.tensor(next_state['image'], dtype=torch.float32).unsqueeze(0).permute(0, 3, 1, 2) / 255.0  # Normalize
-            
-            # Lưu trữ giá trị, hành động và phần thưởng
-            rewards.append(reward)
-            log_probs.append(dist.log_prob(action))
-            values.append(state_value)
-            masks.append(1 - int(done))  # done -> 1 nếu kết thúc, 0 nếu tiếp tục
-            actions.append(action.item())
-            
-            # Cập nhật trạng thái
-            state = next_state
-            
-            if done:
-                break
-        
-        # Tính giá trị return (lợi nhuận)
-        next_value = actor_critic(state)[1]
-        returns = compute_returns(next_value, rewards, masks, gamma)
-        returns = torch.tensor(returns).detach()
-        
-        # Tính toán loss và gradient descent
-        log_probs = torch.stack(log_probs)
-        values = torch.stack(values)
-        
-        # Tính loss
-        advantage = returns - values
-        actor_loss = -(log_probs * advantage.detach()).mean()
-        critic_loss = advantage.pow(2).mean()
-        
-        loss = actor_loss + 0.5 * critic_loss
-        
-        # Cập nhật tham số mạng
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        
-        # In thông tin mỗi epoch
-        if epoch % 10 == 0:
-            print(f"Epoch {epoch}/{num_epochs} | Loss: {loss.item():.3f}")
+            log_prob = dist.log_prob(action)
 
-# Huấn luyện
-train(env, actor_critic, optimizer, num_epochs=1000)
+            next_state, reward, done, _ = env.step(action.cpu().item())
+            next_state = preprocess_frame(next_state).to(device)
+
+            buffer.store(state, action, log_prob, reward, done)
+            state = next_state
+            episode_reward += reward
+
+            if len(buffer.rewards) >= BUFFER_CAPACITY or done:
+                states = torch.stack(buffer.states).to(device)
+                actions = torch.tensor(buffer.actions).to(device)
+                log_probs = torch.stack(buffer.log_probs).to(device)
+                returns = compute_returns(buffer.rewards, buffer.dones, GAMMA).to(device)
+
+                advantages = returns - torch.tensor([policy(state.unsqueeze(0))[1] for state in buffer.states]).to(device).squeeze()
+
+                for _ in range(UPDATE_EPOCHS):
+                    indices = np.arange(len(buffer.rewards))
+                    np.random.shuffle(indices)
+                    for start in range(0, len(buffer.rewards), MINIBATCH_SIZE):
+                        end = start + MINIBATCH_SIZE
+                        mb_indices = indices[start:end]
+
+                        mb_states = states[mb_indices]
+                        mb_actions = actions[mb_indices]
+                        mb_log_probs = log_probs[mb_indices]
+                        mb_advantages = advantages[mb_indices]
+                        mb_returns = returns[mb_indices]
+
+                        new_logits, new_values = policy(mb_states)
+                        new_dist = torch.distributions.Categorical(logits=new_logits)
+                        new_log_probs = new_dist.log_prob(mb_actions)
+
+                        ratio = torch.exp(new_log_probs - mb_log_probs)
+                        surrogate1 = ratio * mb_advantages
+                        surrogate2 = torch.clamp(ratio, 1 - CLIP_EPSILON, 1 + CLIP_EPSILON) * mb_advantages
+                        actor_loss = -torch.min(surrogate1, surrogate2).mean()
+
+                        critic_loss = (mb_returns - new_values.squeeze()).pow(2).mean()
+
+                        loss = actor_loss + 0.5 * critic_loss - 0.01 * new_dist.entropy().mean()
+
+                        optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
+
+                buffer.clear()
+
+        print(f"Episode {episode + 1}: Reward = {episode_reward}")
+
+    return policy
+
+# Main function
+def main():
+    env = gym.make('LunarLander-v3')
+    episodes = 1000
+    trained_policy = train_ppo(env, episodes)
+    torch.save(trained_policy.state_dict(), 'lunar_lander_ppo.pth')
+
+if __name__ == "__main__":
+    main()
