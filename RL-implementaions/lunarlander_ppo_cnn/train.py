@@ -38,8 +38,8 @@ def chooseAction(state):
 def preprocessImage(image):
     transform = transforms.Compose([
         transforms.ToPILImage(),
-        transforms.Grayscale(),
-        transforms.Resize((84, 84)),
+        # transforms.Grayscale(),
+        transforms.Resize((8, 8)),
         transforms.ToTensor()
     ])
     return transform(image).unsqueeze(0)
@@ -107,7 +107,6 @@ if __name__ == '__main__':
             _, reward, done, info, _ = env.step(action)
             next_state = env.render()
             next_state = preprocessImage(next_state)
-            n_steps += 1
             buffer.store_memory(state, action, prob, val, reward, done)
             if n_steps % N == 0:
                 train()
@@ -118,8 +117,8 @@ if __name__ == '__main__':
         avg_score = np.mean(score_history[-100:])
         print(f'episode {i} score {score} avg score {avg_score}')
         
-torch.save(actor.state_dict(), '/Users/vietanh/Documents/Personal-RL-docs/RL-implementaions/lunarlander_ppo/actor_model.pth')
-torch.save(critic.state_dict(), '/Users/vietanh/Documents/Personal-RL-docs/RL-implementaions/lunarlander_ppo/critic_model.pth')
+torch.save(actor.state_dict(), 'actor_model.pth')
+torch.save(critic.state_dict(), 'critic_model.pth')
 
 
             

@@ -12,14 +12,14 @@ class ActorNetwork(nn.Module):
         super().__init__()
         # obs_shape = env.observation_space.shape
         self.network = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(128 * 84 * 84, 512),
+            nn.Linear(64 * 8 * 8, 512),
             nn.ReLU(),
             nn.Linear(512, env.action_space.n),
             nn.Softmax(dim=-1)
@@ -33,14 +33,14 @@ class CriticNetwork(nn.Module):
         super().__init__()
         # obs_shape = env.observation_space.shape
         self.network = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(128 * 84 * 84, 512),
+            nn.Linear(64 * 8 * 8, 512),
             nn.ReLU(),
             nn.Linear(512, 1)
         )
