@@ -1,9 +1,12 @@
 import gymnasium as gym
 from minigrid.wrappers import ImgObsWrapper
-from stable_baselines3 import PPO
+from stable_baselines3 import DQN
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 import torch
 import torch.nn as nn
+import ale_py
+
+gym.register_envs(ale_py)
 
 class MinigridFeaturesExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.Space, features_dim: int = 512) -> None:
@@ -33,8 +36,8 @@ policy_kwargs = dict(
     features_extractor_kwargs=dict(features_dim=128),
 )
 
-env = gym.make("MiniGrid-Empty-16x16-v0", render_mode="rgb_array")
+env = gym.make("ALE/Pong-v5", render_mode="rgb_array")
 env = ImgObsWrapper(env)
 
-model = PPO("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1)
-model.learn(total_timesteps=200000)
+model = DQN("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1)
+model.learn(total_timesteps=1000)

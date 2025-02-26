@@ -1,10 +1,12 @@
+import ale_py
 import random
 import numpy as np
-import gym
+import gymnasium as gym
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from collections import deque
+
 
 # Define the neural network model
 class NeuralNetwork(nn.Module):
@@ -20,6 +22,7 @@ class NeuralNetwork(nn.Module):
         return self.out(x)
 
 rewards = []
+gym.register_envs(ale_py)
 # Define the Agent class
 class MyAgent:
     def __init__(self, state_size, action_size):
@@ -96,7 +99,7 @@ class MyAgent:
 # Main Program
 
 # Initialize environment
-env = gym.make("LunarLander-v2")
+env = gym.make("ALE/Pong-ram-v5")
 state, _ = env.reset()
 
 # Define state and action sizes
