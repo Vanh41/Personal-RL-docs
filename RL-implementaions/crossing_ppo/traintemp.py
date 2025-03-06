@@ -13,7 +13,7 @@ from torchvision import transforms
 
 
 
-env = gym.make("MiniGrid-LavaCrossingS11N5-v0", render_mode = 'rgb_array')
+env = gym.make("MiniGrid-Empty-5x5-v0", render_mode = 'human')
 
 # env = RGBImgPartialObsWrapper(env) # Get pixel observations
 # env = ImgObsWrapper(env) # Get rid of the 'mission' field
@@ -110,7 +110,7 @@ if __name__ == '__main__':
         done = False
         score = 0 
         steps = 0 
-        max_steps = 50
+        max_steps = 1000
         while not done and steps < max_steps:
             action, prob, val = chooseAction(state)
             next_state, reward, done, info, _ = env.step(action)

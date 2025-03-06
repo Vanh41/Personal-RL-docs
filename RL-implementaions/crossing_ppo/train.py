@@ -11,7 +11,7 @@ from model import ActorNetwork, CriticNetwork
 from minigrid.wrappers import FlatObsWrapper, RGBImgPartialObsWrapper, ImgObsWrapper
 
 
-env = gym.make("MiniGrid-LavaCrossingS11N5-v0", render_mode = 'rgb_array')
+env = gym.make("MiniGrid-LavaCrossingS11N5-v0", render_mode = 'human')
 
 # env = RGBImgPartialObsWrapper(env) # Get pixel observations
 env = ImgObsWrapper(env) # Get rid of the 'mission' field
