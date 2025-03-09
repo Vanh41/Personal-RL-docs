@@ -36,7 +36,7 @@ policy_kwargs = dict(
     features_extractor_kwargs=dict(features_dim=128),
 )
 
-env = gym.make("ALE/Pong-v5", render_mode="rgb_array")
+env = gym.make("MiniGrid-Empty-5x5-v0", render_mode="human")
 env = ImgObsWrapper(env)
 
 model = DQN("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1)
