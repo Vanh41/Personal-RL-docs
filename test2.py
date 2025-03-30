@@ -1,7 +1,7 @@
-from google import genai
+import gymnasium as gym 
+import matplotlib.pyplot as plt
+from stable_baselines3 import PPO
+env = gym.make("CarRacing-v3", render_mode = "rgb_array")
 
-client = genai.Client(api_key="AIzaSyD5Kom_ek39c882kX5ELrZZT3UpBB8H46I")
-response = client.models.generate_content(
-    model="gemini-2.0-flash", contents="say hello in vietnamese"
-)
-print(response.text)
+model = PPO("CnnPolicy", env, verbose=1)
+model.learn(total_timesteps=200000, progress_bar=True)
